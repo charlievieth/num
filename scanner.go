@@ -1,6 +1,6 @@
 /*
-	The following part of the code may contain portions of the from the
-	Go standard library (encoding/json/scanner.go), which tells me to
+	The following part of the code may contain portions of the Go
+	standard library (encoding/json/scanner.go), which tells me to
 	retain their copyright notice.
 
 	Copyright (c) 2012 The Go Authors. All rights reserved.
