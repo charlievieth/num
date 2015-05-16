@@ -21,10 +21,10 @@ func main() {
 		if err != nil && err != io.EOF {
 			break
 		}
-		if _, err := n.Write(b[:i]); err != nil {
+		if _, err = n.Write(b[:i]); err != nil {
 			break
 		}
-		if _, err := n.WriteTo(os.Stdout); err != nil {
+		if _, err = n.WriteTo(os.Stdout); err != nil {
 			break
 		}
 	}
