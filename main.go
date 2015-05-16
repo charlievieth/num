@@ -1,27 +1,65 @@
-package main
+package num
 
 import (
 	"bytes"
-	"fmt"
-	"strconv"
+	"io"
 )
-
-var (
-	_ = fmt.Sprint("")
-)
-
-var Test = []byte("a 12345 12a 1 1")
-
-type Pos struct {
-	x, y int
-}
 
 type Num struct {
-	i, j int
-	b    []byte
-	ok   bool
+	buf  *bytes.Buffer
+	scan *scanner
 }
 
+func New() *Num {
+	n := &Num{
+		buf:  bytes.NewBuffer(make([]byte, 0, 4096)),
+		scan: &scanner{},
+	}
+	n.scan.reset()
+	return n
+}
+
+func (n *Num) Write(b []byte) (int, error) {
+	if len(b) == 0 {
+		return 0, nil
+	}
+	var (
+		i, j int
+		c    byte
+	)
+	for i, c = range b {
+		n.scan.bytes++
+		switch n.scan.step(n.scan, int(c)) {
+		case scanBeginNum:
+			j = i
+		case scanEndNum:
+			n.buf.Write(Expand(b[j:i]))
+			n.buf.WriteByte(b[i])
+		case scanNotNum:
+			n.buf.Write(b[j : i+1])
+		case scanError:
+			return i, n.scan.err
+		default:
+			if n.scan.parseState != parseNum {
+				n.buf.WriteByte(c)
+			}
+		}
+	}
+	if n.scan.parseState == parseNum {
+		n.buf.Write(Expand(b[j:]))
+	}
+	return len(b), nil
+}
+
+func (n *Num) WriteTo(w io.Writer) (int64, error) {
+	return n.buf.WriteTo(w)
+}
+
+func (n *Num) Read(p []byte) (int, error) {
+	return n.buf.Read(p)
+}
+
+// Expand a number with commas
 func Expand(b []byte) []byte {
 	n := bytes.IndexByte(b, '.')
 	if n == -1 {
@@ -47,180 +85,37 @@ func Expand(b []byte) []byte {
 	return append(buf, b[n:]...)
 }
 
-func main() {
-	s := &scanner{}
-	s.reset()
-	var pos []Pos
-	var n int
-	for i, c := range Test {
-		switch s.step(s, int(c)) {
-		case scanBeginNum:
-			n = i
-		case scanEndNum:
-			if n == -1 {
-				panic("error")
-			}
-			if i-n > 3 {
-				pos = append(pos, Pos{n, i})
-			}
-		case scanNotNum:
-			n = -1
+// Trims decimals to sf significant figures.
+func TrimDecimal(sf int, b []byte) []byte {
+	n := bytes.IndexByte(b, '.') + 1
+	if n == 0 {
+		return b
+	}
+	if sf == 0 {
+		if n == 1 {
+			return roundDec(b[n:])
 		}
+		return b[:n-1]
 	}
-	// Check if we ended in a num
-	if s.parseState == parseNum && n-len(Test) > 3 {
-		pos = append(pos, Pos{n, len(Test)})
+	if len(b)-n < sf {
+		return b
 	}
-	for _, p := range pos {
-		fmt.Println(string(Test[p.x:p.y]))
-	}
+	return b[:n+sf]
 }
 
-const (
-	scanContinue = iota
-	scanBeginValue
-	scanEndValue
-	scanBeginNum
-	scanEndNum
-	scanNotNum
-	scanSkipSpace
-	scanEnd
-	scanError
-)
-
-const (
-	parseValue = iota
-	parseNum
-)
-
-type scanner struct {
-	step       func(*scanner, int) int
-	state      int
-	err        error
-	parseState int
-}
-
-func (s *scanner) reset() {
-	s.step = stateBeginValue
-	s.parseState = 0
-	s.err = nil
-}
-
-func isSpace(c rune) bool {
-	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
-}
-
-func isNumEnd(c rune) bool {
-	return c == ',' || c == ';' || c == '.'
-}
-
-func stateBeginValue(s *scanner, c int) int {
-	if c <= ' ' && isSpace(rune(c)) {
-		return scanSkipSpace
+// Round to negative infinity, for simplicity.
+func roundDec(b []byte) []byte {
+	if '0' <= b[0] && b[0] < '5' {
+		return []byte{'0'}
 	}
-	if '1' <= c && c <= '9' { // beginning of 1234.5
-		s.step = state1
-		s.parseState = parseNum
-		return scanBeginNum
+	if '5' <= b[0] && b[0] <= '9' {
+		return []byte{'1'}
 	}
-	switch c {
-	case '0': // beginning of 0.123
-		s.step = state0
-		s.parseState = parseNum
-		return scanBeginNum
-	case '-':
-		s.step = stateNeg
-		s.parseState = parseNum
-		return scanBeginValue
-	default:
-		s.step = stateInValue
-		s.parseState = parseValue
-		return scanBeginValue
-	}
+	return []byte{}
 }
 
-func stateEndValue(s *scanner, c int) int {
-	switch s.parseState {
-	case parseNum:
-		if isSpace(rune(c)) {
-			s.step = stateBeginValue
-			return scanEndNum
-		}
-		s.parseState = parseValue
-		s.step = stateInValue
-		return scanNotNum
-	case parseValue:
-		s.step = stateBeginValue
-		return scanEndValue
-	}
-	return s.error(c, "wtf")
-}
-
-func stateInValue(s *scanner, c int) int {
-	if !isSpace(rune(c)) {
-		s.step = stateInValue
-		return scanContinue
-	}
-	return stateEndValue(s, c)
-}
-
-func stateNeg(s *scanner, c int) int {
-	if c == '0' {
-		s.step = state0
-		return scanBeginNum
-	}
-	if '1' <= c && c <= '9' {
-		s.step = state1
-		return scanBeginNum
-	}
-	return stateEndValue(s, c)
-}
-
-func state1(s *scanner, c int) int {
-	if '0' <= c && c <= '9' {
-		s.step = state1
-		return scanContinue
-	}
-	return state0(s, c)
-}
-
-func state0(s *scanner, c int) int {
-	if c == '.' {
-		s.step = stateDot
-		return scanContinue
-	}
-	return stateEndValue(s, c)
-}
-
-func stateDot(s *scanner, c int) int {
-	if '0' <= c && c <= '9' {
-		s.step = stateDot0
-		return scanContinue
-	}
-	return stateEndValue(s, c)
-}
-
-func stateDot0(s *scanner, c int) int {
-	if '0' <= c && c <= '9' {
-		s.step = stateDot0
-		return scanContinue
-	}
-	return stateEndValue(s, c)
-}
-
-func (s *scanner) error(c int, context string) int {
-	// s.step = stateError
-	// s.err = &SyntaxError{"invalid character " + quoteChar(c) + " " + context, s.bytes}
-	return scanError
-}
-
-func quoteChar(c int) string {
-	if c == '\'' {
-		return `'\''`
-	}
-	if c == '"' {
-		return `'"'`
-	}
-	s := strconv.Quote(string(c))
-	return "'" + s[1:len(s)-1] + "'"
-}
+// func main() {
+// 	n := NewNum()
+// 	n.Write(Test)
+// 	fmt.Println(n.buf.String())
+// }
