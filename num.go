@@ -113,9 +113,3 @@ func roundDec(b []byte) []byte {
 	}
 	return []byte{}
 }
-
-// func main() {
-// 	n := NewNum()
-// 	n.Write(Test)
-// 	fmt.Println(n.buf.String())
-// }
