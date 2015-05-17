@@ -1,36 +1,42 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"num"
 	"os"
 )
 
+const bufferSize = 4096
+
 func main() {
 	n := num.New()
-	r := bufio.NewReader(os.Stdin)
-	b := make([]byte, 4096)
-	var (
-		err error
-		i   int
-	)
-	for err == nil {
-		i, err = r.Read(b)
-		if err != nil && err != io.EOF {
-			break
-		}
-		if _, err = n.Write(b[:i]); err != nil {
-			break
-		}
-		if _, err = n.WriteTo(os.Stdout); err != nil {
-			break
-		}
-	}
-	if err != nil && err != io.EOF {
+	if err := fmtStream(n, os.Stdin, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func fmtStream(n *num.Num, r io.Reader, w io.Writer) error {
+	var (
+		err error
+		i   int
+	)
+	b := make([]byte, bufferSize)
+	for err == nil {
+		i, err = r.Read(b)
+		if err == nil || err == io.EOF {
+			if _, err := n.Write(b[:i]); err != nil {
+				return err
+			}
+			if _, err := n.WriteTo(w); err != nil {
+				return err
+			}
+		}
+	}
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
 }
