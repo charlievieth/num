@@ -5,23 +5,33 @@ import (
 	"io"
 )
 
+const DefaultBufferSize = 4096
+
 type Num struct {
-	buf  *bytes.Buffer
-	scan *scanner
+	buf     *bytes.Buffer
+	scan    *scanner
+	partial []byte
 }
 
 func New() *Num {
 	n := &Num{
-		buf:  bytes.NewBuffer(make([]byte, 0, 4096)),
+		buf:  bytes.NewBuffer(make([]byte, 0, DefaultBufferSize)),
 		scan: &scanner{},
 	}
 	n.scan.reset()
 	return n
 }
 
-func (n *Num) Write(b []byte) (int, error) {
-	if len(b) == 0 {
+func (n *Num) Write(p []byte) (int, error) {
+	if len(p) == 0 {
 		return 0, nil
+	}
+	var b []byte
+	if len(n.partial) > 0 {
+		b = append(n.partial, p...)
+		n.partial = n.partial[0:0]
+	} else {
+		b = p
 	}
 	var (
 		i, j int
@@ -46,7 +56,7 @@ func (n *Num) Write(b []byte) (int, error) {
 		}
 	}
 	if n.scan.parseState == parseNum {
-		n.buf.Write(Expand(b[j:]))
+		n.partial = append(n.partial, b[j:]...)
 	}
 	return len(b), nil
 }
