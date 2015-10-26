@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"git.vieth.io/num"
 	"io"
-	"num"
 	"os"
 )
 
