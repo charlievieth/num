@@ -51,30 +51,25 @@ func (n *Num) Write(p []byte) (int, error) {
 	} else {
 		b = p
 	}
-	var j int
+	var lastWrite int
 	for i := start; i < len(b); i++ {
 		n.scan.bytes++
 		switch n.scan.step(n.scan, int(b[i])) {
 		case scanBeginNum:
-			j = i
+			n.buf.Write(b[lastWrite:i])
+			lastWrite = i
 		case scanEndNum:
-			n.scratch = appendExpand(b[j:i], n.scratch[:0])
+			n.scratch = appendExpand(b[lastWrite:i], n.scratch[:0])
 			n.buf.Write(n.scratch)
-			n.buf.WriteByte(b[i])
-		case scanNotNum:
-			n.buf.Write(b[j : i+1])
+			lastWrite = i
 		case scanError:
 			return i, n.scan.err
-		default:
-			// TODO: This is pretty inefficient.
-			if n.scan.parseState != parseNum {
-				n.buf.WriteByte(b[i])
-			}
 		}
 	}
 	if n.scan.parseState == parseNum {
-		n.partial = append(n.partial[:0], b[j:]...)
+		n.partial = append(n.partial[:0], b[lastWrite:]...)
 	} else {
+		n.buf.Write(b[lastWrite:])
 		n.partial = n.partial[:0]
 	}
 	return len(p), nil
