@@ -34,8 +34,6 @@
 
 package num
 
-import "strconv"
-
 const (
 	scanContinue = iota
 	scanBeginValue
@@ -72,6 +70,10 @@ type scanner struct {
 	parseState int
 	bytes      int64
 	err        error
+}
+
+func newScanner() *scanner {
+	return &scanner{step: stateBeginValue}
 }
 
 func (s *scanner) reset() {
@@ -126,7 +128,7 @@ func stateEndValue(s *scanner, c int) int {
 		s.parseState = parseEnd
 		return scanEndValue
 	}
-	return s.error(c, "wtf")
+	return s.error(c, "invalid parse state")
 }
 
 func stateInValue(s *scanner, c int) int {
@@ -189,15 +191,4 @@ func (s *scanner) error(c int, context string) int {
 	s.step = stateError
 	s.err = &ScannerError{context, s.bytes}
 	return scanError
-}
-
-func quoteChar(c int) string {
-	if c == '\'' {
-		return `'\''`
-	}
-	if c == '"' {
-		return `'"'`
-	}
-	s := strconv.Quote(string(c))
-	return "'" + s[1:len(s)-1] + "'"
 }

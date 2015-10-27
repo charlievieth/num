@@ -5,59 +5,91 @@ import (
 	"io"
 )
 
-const DefaultBufferSize = 4096
-
 type Num struct {
-	buf     *bytes.Buffer
+	buf     bytes.Buffer
 	scan    *scanner
 	partial []byte
+	scratch []byte
 }
 
 func New() *Num {
-	n := &Num{
-		buf:  bytes.NewBuffer(make([]byte, 0, DefaultBufferSize)),
-		scan: &scanner{},
+	return &Num{scan: newScanner()}
+}
+
+func (n *Num) init() {
+	if n.scan == nil {
+		n.scan = newScanner()
 	}
-	n.scan.reset()
-	return n
+	if cap(n.scratch) == 0 {
+		n.scratch = make([]byte, 0, 64)
+	}
+}
+
+func (n *Num) Reset() {
+	n.buf.Reset()
+	if n.scan != nil {
+		n.scan.reset()
+	}
+	if len(n.partial) != 0 {
+		n.partial = n.partial[:0]
+	}
+	if len(n.scratch) != 0 {
+		n.scratch = n.scratch[:0]
+	}
 }
 
 func (n *Num) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
+	n.init()
+	start := len(n.partial)
 	var b []byte
-	if len(n.partial) != 0 {
-		b = append(n.partial, p...)
-		n.partial = n.partial[0:0]
+	if start != 0 {
+		n.partial = append(n.partial, p...)
+		b = n.partial
 	} else {
 		b = p
 	}
 	var j int
-	dst := make([]byte, 65)
-	for i, c := range b {
+	for i := start; i < len(b); i++ {
 		n.scan.bytes++
-		switch n.scan.step(n.scan, int(c)) {
+		switch n.scan.step(n.scan, int(b[i])) {
 		case scanBeginNum:
 			j = i
 		case scanEndNum:
-			dst = appendExpand(b[j:i], dst[:0])
-			n.buf.Write(dst)
+			n.scratch = appendExpand(b[j:i], n.scratch[:0])
+			n.buf.Write(n.scratch)
 			n.buf.WriteByte(b[i])
 		case scanNotNum:
 			n.buf.Write(b[j : i+1])
 		case scanError:
 			return i, n.scan.err
 		default:
+			// TODO: This is pretty inefficient.
 			if n.scan.parseState != parseNum {
-				n.buf.WriteByte(c)
+				n.buf.WriteByte(b[i])
 			}
 		}
 	}
 	if n.scan.parseState == parseNum {
-		n.partial = append(n.partial, b[j:]...)
+		n.partial = append(n.partial[:0], b[j:]...)
+	} else {
+		n.partial = n.partial[:0]
 	}
-	return len(b), nil
+	return len(p), nil
+}
+
+func (n *Num) Flush() error {
+	if len(n.partial) == 0 {
+		return nil
+	}
+	if n.scan.parseState == parseNum {
+		n.scratch = appendExpand(n.partial, n.scratch[:0])
+		n.buf.Write(n.scratch)
+		n.scan.reset()
+	}
+	return nil
 }
 
 func (n *Num) WriteTo(w io.Writer) (int64, error) {
@@ -74,7 +106,7 @@ func appendExpand(b, dst []byte) []byte {
 		n = len(b)
 	}
 	if n <= 3 {
-		return b
+		return append(dst, b...)
 	}
 	c := (n % 3)
 	dst = append(dst, b[:c]...)

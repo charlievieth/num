@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const bufferSize = num.DefaultBufferSize
+const bufferSize = 4096
 
 func main() {
 	n := num.New()
