@@ -43,14 +43,38 @@ func TestNilNum(t *testing.T) {
 	}
 }
 
+const benchmarkResultInput = `
+BenchmarkGOROOT-4                 	30000000	        43.2 ns/op	      12 B/op	       0 allocs/op
+BenchmarkCorpus_IndexFiles-4      	       5	 332273086 ns/op	174468006 B/op	  780752 allocs/op
+BenchmarkCorpus_FindFiles-4       	       5	 319671269 ns/op	167605459 B/op	  680913 allocs/op
+BenchmarkCorpus_FindName-4        	       5	 266548976 ns/op	95192496 B/op	  468363 allocs/op
+BenchmarkCorpusUpdate_IndexFiles-4	      10	 122262840 ns/op	43831176 B/op	  380475 allocs/op
+BenchmarkCorpusUpdate_FindFiles-4 	     100	  10244592 ns/op	 4599907 B/op	   47871 allocs/op
+BenchmarkCorpusUpdate_FindName-4  	     200	   8176888 ns/op	 3329827 B/op	   42150 allocs/op
+`
+
+const benchmarkResultOutput = `
+BenchmarkGOROOT-4                 	30,000,000	        43.2 ns/op	      12 B/op	       0 allocs/op
+BenchmarkCorpus_IndexFiles-4      	       5	 332,273,086 ns/op	174,468,006 B/op	  780,752 allocs/op
+BenchmarkCorpus_FindFiles-4       	       5	 319,671,269 ns/op	167,605,459 B/op	  680,913 allocs/op
+BenchmarkCorpus_FindName-4        	       5	 266,548,976 ns/op	95,192,496 B/op	  468,363 allocs/op
+BenchmarkCorpusUpdate_IndexFiles-4	      10	 122,262,840 ns/op	43,831,176 B/op	  380,475 allocs/op
+BenchmarkCorpusUpdate_FindFiles-4 	     100	  10,244,592 ns/op	 4,599,907 B/op	   47,871 allocs/op
+BenchmarkCorpusUpdate_FindName-4  	     200	   8,176,888 ns/op	 3,329,827 B/op	   42,150 allocs/op
+`
+
 var numTests = []testCase{
 	{
-		In:  "a 123.0 x 1234 abc 12345 12345.a0 a 1234567.1234 abc",
-		Out: "a 123.0 x 1,234 abc 12,345 12345.a0 a 1,234,567.1234 abc",
+		In:  "a 123.0 x 1234 abc 12345 12345.a0 a 1234567.1234 317659251 abc",
+		Out: "a 123.0 x 1,234 abc 12,345 12345.a0 a 1,234,567.1234 317,659,251 abc",
 	},
 	{
 		In:  "a 123.0 x 1234 abc 12345 12345.a0 a 1234567.1234",
 		Out: "a 123.0 x 1,234 abc 12,345 12345.a0 a 1,234,567.1234",
+	},
+	{
+		In:  benchmarkResultInput,
+		Out: benchmarkResultOutput,
 	},
 }
 

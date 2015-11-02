@@ -30,12 +30,8 @@ func (n *Num) Reset() {
 	if n.scan != nil {
 		n.scan.reset()
 	}
-	if len(n.partial) != 0 {
-		n.partial = n.partial[:0]
-	}
-	if len(n.scratch) != 0 {
-		n.scratch = n.scratch[:0]
-	}
+	n.partial = n.partial[:0]
+	n.scratch = n.scratch[:0]
 }
 
 func (n *Num) Write(p []byte) (int, error) {
@@ -104,6 +100,9 @@ func appendExpand(b, dst []byte) []byte {
 		return append(dst, b...)
 	}
 	c := (n % 3)
+	if c == 0 {
+		c = 3
+	}
 	dst = append(dst, b[:c]...)
 	for i := c; i < n; i += 3 {
 		dst = append(dst, ',')
