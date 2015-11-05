@@ -228,32 +228,3 @@ func formatNumber(dst, b []byte) []byte {
 	}
 	return append(dst, b[n:]...)
 }
-
-// Trims decimals to sf significant figures.
-func TrimDecimal(sf int, b []byte) []byte {
-	n := bytes.IndexByte(b, '.') + 1
-	if n == 0 {
-		return b
-	}
-	if sf == 0 {
-		if n == 1 {
-			return roundDec(b[n:])
-		}
-		return b[:n-1]
-	}
-	if len(b)-n < sf {
-		return b
-	}
-	return b[:n+sf]
-}
-
-// Round to negative infinity, for simplicity.
-func roundDec(b []byte) []byte {
-	if '0' <= b[0] && b[0] < '5' {
-		return []byte{'0'}
-	}
-	if '5' <= b[0] && b[0] <= '9' {
-		return []byte{'1'}
-	}
-	return []byte{}
-}
