@@ -2,6 +2,7 @@ package num
 
 import (
 	"bytes"
+	"compress/bzip2"
 	"io/ioutil"
 	"testing"
 )
@@ -170,24 +171,30 @@ func BenchmarkFormatNumber_Large(b *testing.B) {
 	}
 }
 
-func BenchmarkNum(b *testing.B) {
-	src, err := ioutil.ReadFile("testdata/test.dat")
+var testdata []byte
+
+func init() {
+	b, err := ioutil.ReadFile("testdata/test.dat.bz2")
 	if err != nil {
-		b.Fatal(err)
+		panic(err)
 	}
-	b.ResetTimer()
+	r := bzip2.NewReader(bytes.NewReader(b))
+	testdata, err = ioutil.ReadAll(r)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func BenchmarkNum(b *testing.B) {
 	n := New()
 	for i := 0; i < b.N; i++ {
-		n.Write(src)
+		n.Write(testdata)
 		n.Reset()
 	}
 }
 
 func BenchmarkNumStream(b *testing.B) {
-	p, err := ioutil.ReadFile("testdata/test.dat")
-	if err != nil {
-		b.Fatal(err)
-	}
+	p := testdata
 	size := bytes.MinRead
 	w := &NopWriter{}
 	b.ResetTimer()
@@ -203,6 +210,18 @@ func BenchmarkNumStream(b *testing.B) {
 			n.WriteTo(w)
 		}
 		n.Reset()
+	}
+}
+
+func BenchmarkStream(b *testing.B) {
+	w := &NopWriter{}
+	r := bytes.NewReader(testdata)
+	b.ResetTimer()
+	for j := 0; j < b.N; j++ {
+		r.Seek(0, 0)
+		if err := NewEncoder(w).Encode(r); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -226,10 +245,7 @@ func (n *NopWriter) Write(p []byte) (int, error) {
 }
 
 func BenchmarkScanner(b *testing.B) {
-	src, err := ioutil.ReadFile("testdata/test.dat")
-	if err != nil {
-		b.Fatal(err)
-	}
+	src := testdata
 	scan := newScanner()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
