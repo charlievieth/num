@@ -96,27 +96,21 @@ func TestNum(t *testing.T) {
 		if out != x.Out {
 			t.Errorf("Num: Output (%+v) %s", x, out)
 		}
-		testStream(x, 2, t)
 	}
 }
 
-func testStream(x testCase, writeSize int, t *testing.T) {
-	num := New()
+func TestEncoder(t *testing.T) {
 	buf := new(bytes.Buffer)
-	var i int
-	for i = 0; i < len(x.In)-writeSize; i += writeSize {
-		num.Write([]byte(x.In[i : i+writeSize]))
-		num.WriteTo(buf)
-	}
-	if i < len(x.In) {
-		num.Write([]byte(x.In[i:]))
-		num.WriteTo(buf)
-	}
-	num.Flush()
-	num.WriteTo(buf)
-	out := buf.String()
-	if out != x.Out {
-		t.Errorf("Stream (%+v) (%d):\n\tExp: %s\n\tOut: %s", x, writeSize, x.Out, out)
+	for _, x := range numTests {
+		buf.Reset()
+		enc := NewEncoder(buf)
+		if err := enc.Encode(bytes.NewReader([]byte(x.In))); err != nil {
+			t.Errorf("Encoder: Error (%+v) %s", x, err)
+		}
+		out := buf.String()
+		if out != x.Out {
+			t.Errorf("Encoder (%+v):\n\tExp: %s\n\tOut: %s", x, x.Out, out)
+		}
 	}
 }
 
@@ -137,19 +131,22 @@ var expandTests = []struct {
 	{"1234567.1", "1,234,567.1"},
 }
 
-func TestExpand(t *testing.T) {
+func TestFormat(t *testing.T) {
 	for _, x := range expandTests {
-		out := string(Expand([]byte(x.In)))
-		if out != x.Exp {
-			t.Errorf("Expand: Expected (%s) got (%s)", x.Exp, out)
+		s, err := Format(x.In)
+		if err != nil {
+			t.Errorf("Expand: error %s", err)
+		}
+		if s != x.Exp {
+			t.Errorf("Expand: Expected (%s) got (%s)", x.Exp, s)
 		}
 	}
 }
 
-func TestAppendExpand(t *testing.T) {
+func TestFormatNumber(t *testing.T) {
 	var b []byte
 	for _, x := range expandTests {
-		b = appendExpand([]byte(x.In), b)
+		b = formatNumber(b, []byte(x.In))
 		if string(b) != x.Exp {
 			t.Errorf("Expand: Expected (%s) got (%s)", x.Exp, string(b))
 		}
@@ -157,33 +154,19 @@ func TestAppendExpand(t *testing.T) {
 	}
 }
 
-func BenchmarkExpand_All(b *testing.B) {
+func BenchmarkFormatNumber_All(b *testing.B) {
+	dst := make([]byte, 65)
 	for i := 0; i < b.N; i++ {
 		for _, x := range expandTests {
-			Expand([]byte(x.In))
+			dst = formatNumber(dst[:0], []byte(x.In))
 		}
 	}
 }
 
-func BenchmarkExpand_Large(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		Expand([]byte("1234567890.1234"))
-	}
-}
-
-func BenchmarkAppendExpand_All(b *testing.B) {
+func BenchmarkFormatNumber_Large(b *testing.B) {
 	dst := make([]byte, 65)
 	for i := 0; i < b.N; i++ {
-		for _, x := range expandTests {
-			dst = appendExpand([]byte(x.In), dst[:0])
-		}
-	}
-}
-
-func BenchmarkAppendExpand_Large(b *testing.B) {
-	dst := make([]byte, 65)
-	for i := 0; i < b.N; i++ {
-		dst = appendExpand([]byte("1234567890.1234"), dst[:0])
+		dst = formatNumber(dst[:0], []byte("1234567890.1234"))
 	}
 }
 

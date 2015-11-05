@@ -2,7 +2,9 @@ package num
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"sync"
 )
 
 type Num struct {
@@ -25,6 +27,7 @@ func (n *Num) init() {
 	}
 }
 
+// Reset, resets the internal state of Num.
 func (n *Num) Reset() {
 	n.buf.Reset()
 	if n.scan != nil {
@@ -34,6 +37,10 @@ func (n *Num) Reset() {
 	n.scratch = n.scratch[:0]
 }
 
+// Write, writes formats any numbers in p and writes the results to the
+// internal buffer.  A state machine is used to keep track of the format
+// state - so if a write ends partially through a number the number will
+// be formatted on the next call to Write or Flush.
 func (n *Num) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
@@ -55,7 +62,7 @@ func (n *Num) Write(p []byte) (int, error) {
 			n.buf.Write(b[lastWrite:i])
 			lastWrite = i
 		case scanEndNum:
-			n.scratch = appendExpand(b[lastWrite:i], n.scratch[:0])
+			n.scratch = formatNumber(n.scratch[:0], b[lastWrite:i])
 			n.buf.Write(n.scratch)
 			lastWrite = i
 		case scanError:
@@ -71,27 +78,138 @@ func (n *Num) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// Flush, formats any partially read numbers and flushes them into the internal
+// buffer.
 func (n *Num) Flush() error {
 	if len(n.partial) == 0 {
 		return nil
 	}
 	if n.scan.parseState == parseNum {
-		n.scratch = appendExpand(n.partial, n.scratch[:0])
+		n.scratch = formatNumber(n.scratch[:0], n.partial)
 		n.buf.Write(n.scratch)
 		n.scan.reset()
+		n.partial = n.partial[:0]
 	}
 	return nil
 }
 
+// WriteTo, flushes any partial numbers and writes the contents of Num's
+// internal buffer to w.
 func (n *Num) WriteTo(w io.Writer) (int64, error) {
+	if err := n.Flush(); err != nil {
+		return 0, err
+	}
 	return n.buf.WriteTo(w)
 }
 
+// Read, flushes any partial numbers and reads up to len(p) bytes from the
+// internal buffer into p.
 func (n *Num) Read(p []byte) (int, error) {
+	if err := n.Flush(); err != nil {
+		return 0, err
+	}
 	return n.buf.Read(p)
 }
 
-func appendExpand(b, dst []byte) []byte {
+var encoderPool sync.Pool
+
+func newEncoder() *Encoder {
+	if v := encoderPool.Get(); v != nil {
+		e := v.(*Encoder)
+		e.reset()
+		return e
+	}
+	return new(Encoder)
+}
+
+// An Encoder is a stream formatter.
+type Encoder struct {
+	w   io.Writer
+	n   Num
+	buf []byte
+}
+
+func (e *Encoder) reset() {
+	e.w = nil
+	e.n.Reset()
+}
+
+// NewEncoder, returns an Encoder that writes to w.
+func NewEncoder(w io.Writer) *Encoder {
+	e := newEncoder()
+	e.w = w
+	return e
+}
+
+// Encode, reads from r formatting any numbers and writes the results to the
+// underlying io.Writer.
+func (e *Encoder) Encode(r io.Reader) error {
+	const bufSize = 32 * 1024
+	if e.w == nil {
+		return errors.New("num: nil writer")
+	}
+	if r == nil {
+		return errors.New("num: nil reader")
+	}
+	if len(e.buf) < bufSize {
+		e.buf = make([]byte, bufSize)
+	}
+	for {
+		n, err := r.Read(e.buf)
+		if err == nil || err == io.EOF {
+			if _, err := e.n.Write(e.buf[:n]); err != nil {
+				return err
+			}
+			if _, err := e.n.WriteTo(e.w); err != nil {
+				return err
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	if err := e.n.Flush(); err != nil {
+		return err
+	}
+	_, err := e.n.WriteTo(e.w)
+	e.w = nil
+	encoderPool.Put(e)
+	return err
+}
+
+// Format, adds thousands separators to string s.  An error is returned is s
+// is not a number.
+func Format(s string) (string, error) {
+	b := []byte(s)
+	if !isNumber(b) {
+		return "", errors.New("num: cannot format string: " + s)
+	}
+	var a [64]byte
+	return string(formatNumber(a[:0], b)), nil
+}
+
+// AppendFormat, adds thousands separators to byte slice b and appends the
+// results to dst.  If b is not a number it is not appended to dst.
+func AppendFormat(dst, b []byte) []byte {
+	if !isNumber(b) {
+		return dst
+	}
+	return formatNumber(dst, b)
+}
+
+func isNumber(b []byte) bool {
+	if len(b) == 0 || b[0] == '.' {
+		return false
+	}
+	for _, c := range b {
+		if ('0' > c || c > '9') && c != '.' {
+			return false
+		}
+	}
+	return true
+}
+
+func formatNumber(dst, b []byte) []byte {
 	n := bytes.IndexByte(b, '.')
 	if n == -1 {
 		n = len(b)
@@ -109,35 +227,6 @@ func appendExpand(b, dst []byte) []byte {
 		dst = append(dst, b[i:i+3]...)
 	}
 	return append(dst, b[n:]...)
-}
-
-// Expand a number with commas
-func Expand(b []byte) []byte {
-	n := bytes.IndexByte(b, '.')
-	if n == -1 {
-		n = len(b)
-	}
-	if n <= 3 {
-		return b
-	}
-	c := 3 - (n % 3)
-	if c == 3 {
-		c = 0
-	}
-	buf := make([]byte, len(b)+(n/3))
-	var o int
-	for i := 0; i < n; i++ {
-		if c == 3 {
-			c = 0
-			buf[o] = ','
-			o++
-		}
-		buf[o] = b[i]
-		o++
-		c++
-	}
-	copy(buf[o:], b[n:])
-	return buf
 }
 
 // Trims decimals to sf significant figures.
