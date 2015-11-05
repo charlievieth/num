@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"sync"
 )
 
 type Num struct {
@@ -112,69 +111,70 @@ func (n *Num) Read(p []byte) (int, error) {
 	return n.buf.Read(p)
 }
 
-var encoderPool sync.Pool
-
-func newEncoder() *Encoder {
-	if v := encoderPool.Get(); v != nil {
-		e := v.(*Encoder)
-		e.reset()
-		return e
-	}
-	return new(Encoder)
-}
-
 // An Encoder is a stream formatter.
 type Encoder struct {
 	w   io.Writer
 	n   Num
 	buf []byte
-}
-
-func (e *Encoder) reset() {
-	e.w = nil
-	e.n.Reset()
+	err error
 }
 
 // NewEncoder, returns an Encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
-	e := newEncoder()
-	e.w = w
-	return e
+	return &Encoder{w: w}
 }
 
 // Encode, reads from r formatting any numbers and writes the results to the
 // underlying io.Writer.
 func (e *Encoder) Encode(r io.Reader) error {
+	if e.err != nil {
+		return e.err
+	}
 	const bufSize = 32 * 1024
-	if e.w == nil {
-		return errors.New("num: nil writer")
-	}
-	if r == nil {
-		return errors.New("num: nil reader")
-	}
 	if len(e.buf) < bufSize {
 		e.buf = make([]byte, bufSize)
 	}
 	for {
 		n, err := r.Read(e.buf)
 		if err == nil || err == io.EOF {
-			if _, err := e.n.Write(e.buf[:n]); err != nil {
-				return err
-			}
-			if _, err := e.n.WriteTo(e.w); err != nil {
-				return err
-			}
+			e.stream(e.buf[:n])
 		}
 		if err != nil {
 			break
 		}
 	}
+	if e.err != nil {
+		return e.err
+	}
 	if err := e.n.Flush(); err != nil {
+		e.err = err
 		return err
 	}
+	if _, err := e.n.WriteTo(e.w); err != nil {
+		e.err = err
+	}
+	return e.err
+}
+
+func (e *Encoder) stream(p []byte) error {
+	if e.err != nil {
+		return e.err
+	}
+	_, err := e.n.Write(p)
+	if err != nil {
+		e.err = err
+	}
+	return e.writeTo()
+}
+
+func (e *Encoder) writeTo() error {
+	if e.err != nil {
+		return e.err
+	}
 	_, err := e.n.WriteTo(e.w)
-	e.w = nil
-	encoderPool.Put(e)
+	if err != nil {
+		e.err = err
+	}
 	return err
 }
 
