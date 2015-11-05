@@ -1,3 +1,4 @@
+// Package num provides tools for adding thousands separators to numbers.
 package num
 
 import (
