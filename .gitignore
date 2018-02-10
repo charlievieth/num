@@ -1,2 +1,6 @@
+*.txt
+*.exe
 testdata/main.go
 testdata/words
+cmd/num/main
+cmd/num/num
