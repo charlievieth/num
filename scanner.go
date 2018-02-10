@@ -87,12 +87,16 @@ func isSpace(c rune) bool {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
 }
 
+func isStart(c rune) bool {
+	return c == '(' || c == '[' || c == '{' || c == '"' || c == '\''
+}
+
 func isEnd(c rune) bool {
-	return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ':' || c == ','
+	return c == ')' || c == ']' || c == '}' || c == '"' || c == '\''
 }
 
 func stateBeginValue(s *scanner, c int) int {
-	if c <= ' ' && isSpace(rune(c)) {
+	if c < ' ' || isSpace(rune(c)) || isStart(rune(c)) {
 		return scanSkipSpace
 	}
 	if '1' <= c && c <= '9' { // beginning of 1234.5
@@ -119,7 +123,7 @@ func stateBeginValue(s *scanner, c int) int {
 func stateEndValue(s *scanner, c int) int {
 	switch s.parseState {
 	case parseNum:
-		if isEnd(rune(c)) {
+		if isSpace(rune(c)) || isEnd(rune(c)) {
 			s.step = stateBeginValue
 			s.parseState = parseEnd
 			return scanEndNum
