@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"git.vieth.io/num"
+	"github.com/charlievieth/num"
 )
 
 func main() {
