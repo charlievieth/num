@@ -115,6 +115,56 @@ func TestEncoder(t *testing.T) {
 	}
 }
 
+func TestFormatInt(t *testing.T) {
+	const MaxInt64 = 1<<63 - 1
+	const MinInt64 = -1 << 63
+	tests := map[int64]string{
+		0:        "0",
+		1:        "1",
+		12:       "12",
+		123:      "123",
+		1234:     "1,234",
+		12345:    "12,345",
+		123456:   "123,456",
+		1234567:  "1,234,567",
+		MaxInt64: "9,223,372,036,854,775,807",
+		-1:       "-1",
+		-12:      "-12",
+		-123:     "-123",
+		-1234:    "-1,234",
+		-12345:   "-12,345",
+		-123456:  "-123,456",
+		-1234567: "-1,234,567",
+		MinInt64: "-9,223,372,036,854,775,808",
+	}
+	for val, exp := range tests {
+		s := FormatInt(val)
+		if s != exp {
+			t.Errorf("FormatUint: got: %q want: %q", s, exp)
+		}
+	}
+}
+
+func TestFormatUint(t *testing.T) {
+	const MaxUint64 = 1<<64 - 1
+	tests := map[uint64]string{
+		1:         "1",
+		12:        "12",
+		123:       "123",
+		1234:      "1,234",
+		12345:     "12,345",
+		123456:    "123,456",
+		1234567:   "1,234,567",
+		MaxUint64: "18,446,744,073,709,551,615",
+	}
+	for val, exp := range tests {
+		s := FormatUint(val)
+		if s != exp {
+			t.Errorf("FormatUint: got: %q want: %q", s, exp)
+		}
+	}
+}
+
 var expandTests = []struct {
 	In  string
 	Exp string

@@ -178,6 +178,69 @@ func (e *Encoder) writeTo() error {
 	return err
 }
 
+// small returns the string for an i with 0 <= i < nSmalls.
+func small(i int) string {
+	if i < 10 {
+		return digits[i : i+1]
+	}
+	return smallsString[i*2 : i*2+2]
+}
+
+const nSmalls = 100
+
+const smallsString = "00010203040506070809" +
+	"10111213141516171819" +
+	"20212223242526272829" +
+	"30313233343536373839" +
+	"40414243444546474849" +
+	"50515253545556575859" +
+	"60616263646566676869" +
+	"70717273747576777879" +
+	"80818283848586878889" +
+	"90919293949596979899"
+
+const digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+func FormatInt(val int64) string {
+	if 0 <= val && val < nSmalls {
+		return small(int(val))
+	}
+	return formatBits(uint64(val), val < 0)
+}
+
+func FormatUint(val uint64) string {
+	if val < nSmalls {
+		return small(int(val))
+	}
+	return formatBits(val, val < 0)
+}
+
+func formatBits(val uint64, neg bool) string {
+	var buf [26]byte
+	if neg {
+		val = -val
+	}
+	i := len(buf) - 1
+	n := 0
+	for val >= 10 {
+		buf[i] = byte(val%10 + '0')
+		i--
+		val /= 10
+		n++
+		if n == 3 {
+			buf[i] = ','
+			i--
+			n = 0
+		}
+	}
+	buf[i] = byte(val + '0')
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
+}
+
 // Format, adds thousands separators to string s.  An error is returned is s
 // is not a number.
 func Format(s string) (string, error) {
