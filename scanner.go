@@ -92,7 +92,7 @@ func isStart(c rune) bool {
 }
 
 func isEnd(c rune) bool {
-	return c == ')' || c == ']' || c == '}' || c == '"' || c == '\''
+	return c == ')' || c == ']' || c == '}' || c == '"' || c == '\'' || c == '%'
 }
 
 func stateBeginValue(s *scanner, c int) int {

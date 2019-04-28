@@ -77,6 +77,10 @@ var numTests = []testCase{
 		In:  benchmarkResultInput,
 		Out: benchmarkResultOutput,
 	},
+	{
+		In:  "ring_test.go:29: Total: 746342 Sent: 198468 Dropped: 547874% - 73.408",
+		Out: "ring_test.go:29: Total: 746,342 Sent: 198,468 Dropped: 547,874% - 73.408",
+	},
 }
 
 func TestNum(t *testing.T) {
