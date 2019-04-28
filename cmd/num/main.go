@@ -68,7 +68,7 @@ func formatText(out *os.File, args []string) error {
 
 func realMain() error {
 	out := os.Stdout
-	if OutputFile != "" {
+	if OutputFile != "" && OutputFile != "-" {
 		f, err := os.OpenFile(OutputFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err != nil {
 			return err
@@ -78,7 +78,7 @@ func realMain() error {
 	}
 
 	in := os.Stdin
-	if InputFile != "" {
+	if InputFile != "" && InputFile != "-" {
 		f, err := os.Open(InputFile)
 		if err != nil {
 			return err
