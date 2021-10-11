@@ -2,13 +2,13 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/charlievieth/num"
+	"github.com/spf13/pflag"
 )
 
 var (
@@ -17,13 +17,11 @@ var (
 )
 
 func init() {
-	flag.Usage = Usage
-
-	flag.StringVar(&InputFile, "i", "", "read input from FILE instead of standard input")
-	flag.StringVar(&InputFile, "-input", "", "read input from FILE instead of standard input")
-
-	flag.StringVar(&OutputFile, "o", "", "write result to FILE instead of standard output")
-	flag.StringVar(&OutputFile, "-output", "", "write result to FILE instead of standard output")
+	pflag.Usage = Usage
+	pflag.StringVarP(&InputFile, "input", "i", "",
+		"read input from FILE instead of standard input")
+	pflag.StringVarP(&OutputFile, "output", "o", "",
+		"write result to FILE instead of standard output")
 }
 
 func Usage() {
@@ -31,23 +29,24 @@ func Usage() {
 		"Add thousands separators to TEXT and write the result to standard output.\n" +
 		"\n" +
 		"With no TEXT or FILE, or when FILE is -, read standard input.\n\n"
-	fmt.Fprintf(flag.CommandLine.Output(), message, filepath.Base(os.Args[0]))
-	flag.PrintDefaults()
+	fmt.Fprintf(os.Stdout, message, filepath.Base(os.Args[0]))
+	pflag.PrintDefaults()
+
 	const example = "\nEXAMPLES:\n" +
 		"\n" +
-		"\techo '123456' | %[1]s\n" +
+		"  $ echo '123456' | %[1]s\n" +
 		"\n" +
-		"\tWill print '123,456' on standard output.\n" +
+		"  Will print '123,456' on standard output.\n" +
 		"\n" +
-		"\t%[1]s '123456'\n" +
+		"  $ %[1]s '123456'\n" +
 		"\n" +
-		"\tWill print '123,456' on standard output.\n" +
+		"  Will print '123,456' on standard output.\n" +
 		"\n" +
-		"\t%[1]s -i FILE\n" +
+		"  $ %[1]s -i FILE\n" +
 		"\n" +
-		"\tWill read from FILE, add thousands separators\n" +
-		"\tand print the result on standard output.\n"
-	fmt.Fprintf(flag.CommandLine.Output(), example, filepath.Base(os.Args[0]))
+		"  Will read from FILE, add thousands separators\n" +
+		"  and print the result on standard output.\n"
+	fmt.Fprintf(os.Stdout, example, filepath.Base(os.Args[0]))
 }
 
 func formatText(out *os.File, args []string) error {
@@ -87,8 +86,8 @@ func realMain() error {
 		in = f
 	}
 
-	if flag.NArg() != 0 {
-		return formatText(out, flag.Args())
+	if pflag.NArg() != 0 {
+		return formatText(out, pflag.Args())
 	}
 
 	// stream
@@ -96,16 +95,16 @@ func realMain() error {
 }
 
 func main() {
-	flag.Parse()
+	pflag.Parse()
 
-	if flag.NArg() != 0 && InputFile != "" {
-		fmt.Fprintln(flag.CommandLine.Output(), "Error: TEXT and '--input' cannot both be specified")
-		flag.Usage()
+	if pflag.NArg() != 0 && InputFile != "" {
+		fmt.Fprintln(os.Stderr, "error: TEXT and '--input' cannot both be specified")
+		pflag.Usage()
 		os.Exit(1)
 	}
 
 	if err := realMain(); err != nil {
-		fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
+		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
