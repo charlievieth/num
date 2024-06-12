@@ -209,6 +209,21 @@ func TestFormatNumber(t *testing.T) {
 	}
 }
 
+func TestFormatFloat(t *testing.T) {
+	tests := []struct {
+		f    float64
+		want string
+	}{
+		{1_234_567.123456, "1,234,567.123456"},
+	}
+	for _, x := range tests {
+		got := FormatFloat(x.f, 'f', -1, 64)
+		if got != x.want {
+			t.Errorf("FormatFloat(%f, 'f', -1, 64) = %q; want: %q", x.f, got, x.want)
+		}
+	}
+}
+
 func BenchmarkFormatNumber_All(b *testing.B) {
 	dst := make([]byte, 65)
 	for i := 0; i < b.N; i++ {

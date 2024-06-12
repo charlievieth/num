@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"strconv"
+	"strings"
 )
 
 type Num struct {
@@ -239,6 +241,15 @@ func formatBits(val uint64, neg bool) string {
 		buf[i] = '-'
 	}
 	return string(buf[i:])
+}
+
+// func FormatFloat(f float64, fmt byte, prec, bitSize int) string {
+func FormatFloat(f float64, fmt byte, prec, bitSize int) string {
+	s := strconv.FormatFloat(f, fmt, prec, bitSize)
+	if before, after, ok := strings.Cut(s, "."); ok {
+		s = string(formatNumber(nil, []byte(before))) + "." + after
+	}
+	return s
 }
 
 // Format, adds thousands separators to string s.  An error is returned is s
